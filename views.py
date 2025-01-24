@@ -4,11 +4,9 @@ from config import *
 from models import User , Vehicle ,  Slot , ParkingSlot ,Response , Payment , Reservation
 from config import *
 from models import Session
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError , NoResultFound
 from datetime import datetime
 from sqlalchemy import func
-
-
 
 
 class Login:
@@ -34,14 +32,12 @@ class Login:
         self.email_label.grid(row=2, column=0, padx=20, pady=20, sticky="w")
         self.email_entry = tk.Entry(self.frame, width=30)
         self.email_entry.grid(row=2, column=1, padx=20, pady=20)
-        self.email_entry.insert(0 , "nasrkihagila@gmail.com")
 
         # Password field
         self.password_label = tk.Label(self.frame, text="Password", font=FONT)
         self.password_label.grid(row=5, column=0, padx=20, pady=20, sticky="w")
         self.password_entry = tk.Entry(self.frame, show='*', width=30)
         self.password_entry.grid(row=5, column=1, padx=20, pady=20)
-        self.password_entry.insert(0 , "Hassan14@")
 
         # Login button
         self.login_button = tk.Button(
@@ -78,11 +74,14 @@ class Login:
             return messagebox.showerror('WARNING' , "Please Fill in all credentials")
 
         
-        auth_user = User.login(email=email, password=password)
-        if auth_user:
-            messagebox.showinfo("LOGGED IN SOON" ,"You have successfully logged in")
+        result = User().login(email=email, password=password)
+        
+        if result['success']:
+            messagebox.showinfo("LOGGED IN SOON" ,result['message'])
             Dashboard(self.root).show_dashboard()
-            self.hide_frame()
+            return self.hide_frame()
+            
+        return messagebox.showwarning("WARNING" , result['message'])    
 
 class SignUp:
     def __init__(self, root,  switch_to_login=None):
@@ -202,10 +201,6 @@ class Dashboard(Response):
         self.reservations_menu.add_command(label="Manage Reservations", command=self.show_reservations)
         self.menu.add_cascade(label="Reservations", menu=self.reservations_menu)
 
-        # Profile Menu
-        self.profile_menu = tk.Menu(self.menu, tearoff=0, bg=MAIN_COLOR, fg="white", activebackground=MAIN_COLOR, activeforeground="white")
-        self.profile_menu.add_command(label="View Profile", command=self.show_profile)
-        self.menu.add_cascade(label="Profile", menu=self.profile_menu)
 
         # Frames
         self.dashboard_frame = tk.Frame(self.root, bg="#e6e6e6", padx=20, pady=20)
@@ -262,7 +257,7 @@ class Dashboard(Response):
         card_frame_2.grid(row=1, column=1, padx=10, pady=10, sticky="ew")  # Only expand horizontally
 
         # Available parking slots label
-        available_slots = Session().query(Slot).filter(Slot.is_occupied == False).count()
+        available_slots = Session().query(Slot).filter(Slot.is_occupied == False , Slot.is_reserved == False).count()
         card_title_2 = tk.Label(card_frame_2, text="Available Slots", font=("Arial", 16, "bold"), bg="#80ccff")
         card_title_2.grid(row=0, column=0, pady=(0, 10))
 
@@ -474,13 +469,6 @@ class Dashboard(Response):
         
         if not result['success']:
             return messagebox.showwarning('ERROR' , result['message'])
-
-    def show_profile(self):
-        """Displays the User Profile frame."""
-        profile_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
-        label = tk.Label(profile_frame, text="User Profile", font=("Arial", 24), bg="#f2f2f2")
-        label.grid(row=0, column=0, pady=20)
-        self.show_frame(profile_frame)
 
     def show_parking_slots(self):
         """Displays the Parking Slots management frame."""
@@ -955,6 +943,10 @@ class Dashboard(Response):
                 return messagebox.showwarning("ERROR", f"Slot {slot_name} is already reserved for {email}.")
 
             # Create a new reservation record
+            reserved = session.query(Reservation).filter(Reservation.customer_id == customer_id).first()
+            if reserved:
+                session.delete(reserved)
+                
             new_reservation = Reservation(customer_id=customer_id, slot_id=slot_id ,reservation_time= datetime.now())
             session.add(new_reservation)
             
@@ -1038,41 +1030,55 @@ class Dashboard(Response):
             messagebox.showerror("ERROR", f"Error refreshing reservation table: {str(e)}")
         finally:
             session.close()
+    
+    def release_reservation(self):
+        session = Session()
+        slot_name_field = self.reservation_check.get()
+        
+        if not slot_name_field:
+            return messagebox.showwarning('WARNING' , 'Please provide the slot name')
 
-    def release_reservation(self, reservation_id):
-        """Releases a reservation, marking the slot as available and removing the reservation entry."""
         try:
-            session = Session()
+            # Fetch the slot record
+            slot = session.query(Slot).filter(Slot.slot_name == slot_name_field).first()
 
-            # Query the reservation by ID (or another identifying method)
-            reservation = session.query(Reservation).filter(Reservation.reservation_id == reservation_id).first()
+            if not slot:
+                messagebox.showerror("Error", f"No slot found with name '{slot_name_field}'.")
+                return
+
+            reservation = (
+                session.query(Reservation)
+                .join(Slot, Reservation.slot_id == Slot.slot_id)
+                .filter( Slot.slot_id == slot.slot_id)
+                .first() 
+            )
 
             if not reservation:
-                return messagebox.showwarning("ERROR", "Reservation not found.")
+                messagebox.showerror("Error", f"No active reservation found for slot '{slot_name_field}'.")
+                return
 
-            # Query the parking slot associated with the reservation
-            parking_slot = session.query(Slot).filter(Slot.slot_id == reservation.slot_id).first()
+            # Fetch the slot record
+            slot = session.query(Slot).filter(Slot.slot_name == slot_name_field).first()
 
-            if not parking_slot:
-                return messagebox.showwarning("ERROR", "Parking slot not found.")
+            if not slot:
+                messagebox.showerror("Error", f"No slot found with name '{slot_name_field}'.")
+                return
 
-            # Set the slot as available (not reserved)
-            parking_slot.is_reserved = False
+            # Update the Slot table: set is_reserved to False
+            slot.is_reserved = False
+
+            # Update the Reservation table: set slot_id to None and update release_time
+            reservation.slot_id = None
+            reservation.released_time = datetime.now()
+
+            # Commit changes to the database
             session.commit()
-
-            # Delete the reservation record from the database
-            session.delete(reservation)
-            session.commit()
-
-            # Refresh the reservation table to reflect the change
             self.refresh_reservation_table()
-
-            messagebox.showinfo("SUCCESS", "Reservation successfully released and slot made available.")
+            messagebox.showinfo("SUCCESS", f"Reservation for slot '{slot_name_field}' released successfully.")
 
         except Exception as e:
             session.rollback()
-            messagebox.showerror("ERROR", f"Error releasing reservation: {str(e)}")
-
+            messagebox.showerror("Error", f"An error occurred while releasing the reservation: {str(e)}")
         finally:
             session.close()
 
@@ -1124,26 +1130,42 @@ class Dashboard(Response):
         # Reservation Form Label
         reservation_label = tk.Label(forms_frame, text="Reserve Parking Slot", font=FONT, bg="#ffffff", fg="#555555")
         reservation_label.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+        
+         # Slot Name
+        self.reservation=tk.Label(forms_frame, text="Slot Name:", font=("Arial", 12), bg="#ffffff")
+        self.reservation.grid(row=1, column=0, pady=5, sticky="w")
+        self.slots = self.get_reserved_slots()  
+        self.reservation_check = ttk.Combobox(forms_frame, values=self.slots, state="readonly", width=30)
+        self.reservation_check.grid(row=1, column=1, padx=10, pady=5)
+        
+        # Release Button
+        self.reserve_button = tk.Button(
+            forms_frame, text="Release Slot", fg="white", font=("Arial", 12, "bold"), bg=MAIN_COLOR,
+            command=self.release_reservation, width=20
+        )
+        self.reserve_button.grid(row=2, column=1, padx=10, pady=10, sticky="we")
 
         # Customer Email
         self.reservation_email_label = tk.Label(forms_frame, text="Customer Email:", font=("Arial", 12), bg="#ffffff")
-        self.reservation_email_label.grid(row=1, column=0,pady=5, sticky="w")
+        self.reservation_email_label.grid(row=3, column=0,pady=5, sticky="w")
         self.reservation_email = tk.Entry(forms_frame, width=30)
-        self.reservation_email.grid(row=1, column=1, padx=10, pady=5)
+        self.reservation_email.grid(row=3, column=1, padx=10, pady=5)
 
+        
         # Slot Name
         self.reservation_slot_label = tk.Label(forms_frame, text="Slot Name:", font=("Arial", 12), bg="#ffffff")
-        self.reservation_slot_label.grid(row=2, column=0, pady=5, sticky="w")
+        self.reservation_slot_label.grid(row=4, column=0, pady=5, sticky="w")
         self.slots = self.get_available_slots()  
         self.reservation_slot = ttk.Combobox(forms_frame, values=self.slots, state="readonly", width=30)
-        self.reservation_slot.grid(row=2, column=1, padx=10, pady=5)
+        self.reservation_slot.grid(row=4, column=1, padx=10, pady=5)
+    
 
         # Reserve Button
         self.reserve_button = tk.Button(
             forms_frame, text="Reserve Slot", fg="white", font=("Arial", 12, "bold"), bg=MAIN_COLOR,
             command=self.reserve_slot, width=20
         )
-        self.reserve_button.grid(row=3, column=1, padx=10, pady=10, sticky="we")
+        self.reserve_button.grid(row=5, column=1, padx=10, pady=10, sticky="we")
         
         # Table Frame for Displaying Reserved Slots
         table_frame = tk.Frame(reservations_frame, bg="#f2f2f2", bd=3, relief="raised" ,pady=10 ,padx=10)

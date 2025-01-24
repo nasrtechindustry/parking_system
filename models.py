@@ -60,29 +60,31 @@ class User(Base , Response):
             self.session.rollback()
             return f"Error: {str(e)}"
 
-    @classmethod
-    def login(cls, email, password):
+    def login(self, email, password):
         """Validates user credentials and returns user data if valid."""
         session = Session()
         try:
             # Fetch the user from the database
-            user = session.query(cls).filter_by(email=email).first()
-            if user and user.password == password:
-                # Return user data if credentials are valid
-                data =  {
+            user = session.query(User).filter(User.email == email).first()
+
+            if user and user.password == password: 
+                if user.role == 'customer':  
+                    return self.error_response("Customers are not allowed to view anything")
+
+                # Build the response data for successful login
+                data = {
                     "id": user.user_id,
                     "email": user.email,
-                    "role": user.role, 
+                    "role": user.role,
                 }
-                
-                return cls.success_response('logged in successully' , data=data)
-            else:
-                return {"error": "Invalid email or password."}
+                return self.success_response(message="Logged in successfully", data=data)
+
+            # Invalid credentials
+            return self.error_response("Invalid credentials. Please try again.")
         except Exception as e:
             return {"error": str(e)}  # Return any exception message for debugging
         finally:
             session.close()
-
 
     def logout(self):
         """Logs out the user."""
@@ -101,39 +103,6 @@ class User(Base , Response):
             }
         return "User not found."
 
-    def add_slot(self, slot_name, created_by):
-        """Adds a new parking slot."""
-        slot = Slot(slot_name=slot_name, created_by=created_by)
-        try:
-            self.session.add(slot)
-            self.session.commit()
-            return "Slot added successfully."
-        except Exception as e:
-            self.session.rollback()
-            return f"Error: {str(e)}"
-
-    def reserve_slot(self, customer_id, slot_id):
-        """Reserves a parking slot."""
-        reservation = Reservation(customer_id=customer_id, slot_id=slot_id)
-        try:
-            self.session.add(reservation)
-            self.session.commit()
-            return "Slot reserved successfully."
-        except Exception as e:
-            self.session.rollback()
-            return f"Error: {str(e)}"
-
-    
-    def make_payment(self, vehicle_id, payment_amount):
-        """Records a payment."""
-        payment = Payment(vehicle_id=vehicle_id, payment_amount=payment_amount)
-        try:
-            self.session.add(payment)
-            self.session.commit()
-            return "Payment recorded successfully."
-        except Exception as e:
-            self.session.rollback()
-            return f"Error: {str(e)}"
 
 class Slot(Base ,Response):
     __tablename__ = "slots"
@@ -300,5 +269,3 @@ if not os.path.exists(db):
     print("database created successfully")
    
 
-
-# print(ParkingSlot().get_assigned_vehicles())
