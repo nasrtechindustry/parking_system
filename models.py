@@ -281,7 +281,7 @@ class ParkingSlot(Base ,Response):
 
 class Reservation(Base):
     __tablename__ = "reservations"
-    reservation_id = sm.Column('reservation_id', sm.String(36) , primary_key=True, default=uuid.uuid1())
+    reservation_id = sm.Column('reservation_id', sm.String(36) , primary_key=True, default=lambda: str(uuid.uuid1()))
     customer_id = sm.Column("customer_id" , sm.String(36) , sm.ForeignKey(Customer.customer_id) , nullable=True)
     slot_id = sm.Column("slot_id" , sm.String(36) , sm.ForeignKey(Slot.slot_id) , nullable=True)
     reservation_time = sm.Column('reservation_time' ,sm.DateTime() , default=datetime.now())

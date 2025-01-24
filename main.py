@@ -45,15 +45,7 @@ def main():
     root.geometry(f"{screen_width}x{screen_height}")
     root.config(bg=MAIN_COLOR)
     
-    app = SmartParkingApp(root)
-    
-    footer = tk.Label(
-        root, 
-        text=f"Developed by Group number one \n copyright @ {datetime.now().year} | All rights are reserved",
-        padx=20,
-        pady=20,
-        fg="white"
-    )
+    SmartParkingApp(root)
     
     root.mainloop()
 

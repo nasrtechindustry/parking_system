@@ -1,11 +1,13 @@
 import tkinter as tk
 from tkinter import messagebox , ttk
 from config import *
-from models import User , Vehicle ,  Slot , ParkingSlot ,Response , Payment
+from models import User , Vehicle ,  Slot , ParkingSlot ,Response , Payment , Reservation
 from config import *
 from models import Session
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
+from sqlalchemy import func
+
 
 
 
@@ -168,7 +170,7 @@ class Dashboard(Response):
     """THIS IS DASHBOARD VIEW"""
     def __init__(self, root):
         self.root = root
-        self.root.title("Dashboard")
+        # self.root.title("Dashboard")
         self.root.configure(bg="#f0f0f5")
 
         self.menu = tk.Menu(self.root, bg=MAIN_COLOR, fg="white", activebackground=MAIN_COLOR, activeforeground="white")
@@ -209,6 +211,10 @@ class Dashboard(Response):
         self.dashboard_frame = tk.Frame(self.root, bg="#e6e6e6", padx=20, pady=20)
         self.dashboard_frame.grid(row=0, column=0, sticky="nsew")
 
+        # Ensure the row and column in the root are configured to expand and fill the space
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+
     def clear_frame(self):
         """Clears all widgets from the current frame."""
         for widget in self.root.winfo_children():
@@ -219,25 +225,62 @@ class Dashboard(Response):
         """Displays the specified frame."""
         self.clear_frame()
         frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
+    
     def show_dashboard(self):
         """Displays the Dashboard frame."""
-        # Clear and set up the Dashboard frame
-        self.dashboard_frame = tk.Frame(self.root,  padx=20, pady=20 ,bg="#f2f2f2")
-        label = tk.Label(self.dashboard_frame, text="Welcome To Seamless Smart Parking management system ", font=FONT, bg="#e6e6e6")
-        label.grid(row=0, column=0, pady=20, sticky="w")
+        self.dashboard_frame = tk.Frame(self.root, padx=20, pady=20, bg="#f2f2f2")
+        
+        # Set up the grid for the dashboard frame to expand
+        self.dashboard_frame.grid(row=0, column=0, sticky="nsew")
+        self.root.grid_rowconfigure(0, weight=1) 
+        self.dashboard_frame.grid_rowconfigure(0, weight=0)  
+        self.dashboard_frame.grid_rowconfigure(1, weight=0)
+        
+        # Configure columns for the cards to expand proportionally
+        self.dashboard_frame.grid_columnconfigure(0, weight=1)
+        self.dashboard_frame.grid_columnconfigure(1, weight=1)
+        self.dashboard_frame.grid_columnconfigure(2, weight=1)
+
+        # Label at the top of the dashboard
+        label = tk.Label(self.dashboard_frame, text="Welcome To Seamless Smart Parking Management System", font=FONT, fg=MAIN_COLOR, pady=10)
+        label.grid(row=0, column=0, columnspan=3, pady=10, sticky="we")
 
         # Card to display total vehicles
-        card_frame = tk.Frame(self.dashboard_frame, bg="#ffaacc", relief="raised", bd=3, padx=20, pady=20)
-        card_frame.grid(row=1, column=0, padx=10, pady=10, sticky="n")
+        card_frame_1 = tk.Frame(self.dashboard_frame, bg="#ffaacc", relief="raised", bd=3, padx=20, pady=20)
+        card_frame_1.grid(row=1, column=0, padx=10, pady=10, sticky="ew")  # Only expand horizontally
 
         # Total vehicles label
         total_vehicles = Session().query(Vehicle).count()
-        card_title = tk.Label(card_frame, text="Total Vehicles", font=("Arial", 16, "bold"), bg="#ffaacc")
-        card_title.grid(row=0, column=0, pady=(0, 10))
+        card_title_1 = tk.Label(card_frame_1, text="Total Vehicles", font=("Arial", 16, "bold"), bg="#ffaacc")
+        card_title_1.grid(row=0, column=0, pady=(0, 10))
 
-        vehicle_count_label = tk.Label(card_frame, text=str(total_vehicles), font=("Arial", 24, "bold"), fg="#4CAF50",bg="#ffaacc")
+        vehicle_count_label = tk.Label(card_frame_1, text=str(total_vehicles), font=("Arial", 24, "bold"), fg="#4CAF50", bg="#ffaacc")
         vehicle_count_label.grid(row=1, column=0)
+
+        # Card to display available parking slots
+        card_frame_2 = tk.Frame(self.dashboard_frame, bg="#80ccff", relief="raised", bd=3, padx=20, pady=20)
+        card_frame_2.grid(row=1, column=1, padx=10, pady=10, sticky="ew")  # Only expand horizontally
+
+        # Available parking slots label
+        available_slots = Session().query(Slot).filter(Slot.is_occupied == False).count()
+        card_title_2 = tk.Label(card_frame_2, text="Available Slots", font=("Arial", 16, "bold"), bg="#80ccff")
+        card_title_2.grid(row=0, column=0, pady=(0, 10))
+
+        available_slots_label = tk.Label(card_frame_2, text=str(available_slots), font=("Arial", 24, "bold"), fg="#4CAF50", bg="#80ccff")
+        available_slots_label.grid(row=1, column=0)
+
+        # Card to display total revenue
+        card_frame_3 = tk.Frame(self.dashboard_frame, bg="#ffc107", relief="raised", bd=3, padx=20, pady=20)
+        card_frame_3.grid(row=1, column=2, padx=10, pady=10, sticky="ew")  # Only expand horizontally
+
+        # Calculate total revenue
+        total_revenue = Session().query(func.sum(Payment.payment_amount)).filter(Payment.is_paid == True).scalar() or 0
+
+        card_title_3 = tk.Label(card_frame_3, text="Total Revenue", font=("Arial", 16, "bold"), bg="#ffc107")
+        card_title_3.grid(row=0, column=0, pady=(0, 10))
+
+        total_revenue_label = tk.Label(card_frame_3, text=str(total_revenue) + " TZS", font=("Arial", 24, "bold"), fg="#4CAF50", bg="#ffc107")
+        total_revenue_label.grid(row=1, column=0)
 
         self.show_frame(self.dashboard_frame)
 
@@ -265,11 +308,12 @@ class Dashboard(Response):
         vehicles_frame = tk.Frame(self.root , padx=20, pady=20 ,bg="#f2f2f2")
         
         # Add vehicle form
-        add_vehicle_form = tk.Frame(vehicles_frame, relief="raised", bd=3 , padx=10, pady=10 , bg='#fff')
+        add_vehicle_form = tk.Frame(vehicles_frame, relief="raised", bd=3 , padx=10, pady=10 , bg='#fff' )
         add_vehicle_form.grid(row=1, column=0, padx=20, pady=20, sticky="n")
         
-        label = tk.Label(vehicles_frame, text="VEHICLES MANAGEMENT", font=FONT )
-        label.grid(row=0, column=0, pady=10 , columnspan=2 , sticky='w' , padx=10 ,)
+        
+        label = tk.Label(vehicles_frame, text="VEHICLES MANAGEMENT", font=FONT  , fg=MAIN_COLOR ,pady=10)
+        label.grid(row=0, column=0, pady=10 , columnspan=2 , sticky='we' , padx=10 ,)
 
         label = tk.Label(add_vehicle_form, text="Manage vehicles", font=FONT , bg='#fff')
         label.grid(row=0, column=0, pady=10 , columnspan=3 , sticky='w' , padx=10)
@@ -344,18 +388,7 @@ class Dashboard(Response):
                 "", "end", values=(str(f'{x}'),vehicle["plate_number"], full_name, vehicle["email"], "Delete")
             )
 
-        # Add Action Buttons
-        def handle_actions(event):
-            selected_item = self.vehicle_trees.selection()
-            if selected_item:
-                vehicle_data = self.vehicle_trees.item(selected_item)["values"]
-                plate_number = vehicle_data[0]
-
-                # Example: Delete action
-                self.delete_vehicle({"plate_number": plate_number})
-                self.vehicle_trees.delete(selected_item)
-
-        self.vehicle_trees.bind("<Double-1>", handle_actions)
+       
 
                 # Show the frame
         vehicles_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -442,13 +475,6 @@ class Dashboard(Response):
         if not result['success']:
             return messagebox.showwarning('ERROR' , result['message'])
 
-    def show_reservations(self):
-        """Displays the Reservations management frame."""
-        reservations_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
-        label = tk.Label(reservations_frame, text="Manage Reservations", font=("Arial", 24), bg="#f2f2f2")
-        label.grid(row=0, column=0, pady=20)
-        self.show_frame(reservations_frame)
-
     def show_profile(self):
         """Displays the User Profile frame."""
         profile_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
@@ -461,19 +487,19 @@ class Dashboard(Response):
         parking_slots_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
 
         # Header Label
-        label = tk.Label(parking_slots_frame, text="PARKING SLOT MANAGEMENT", font=FONT, bg="#f2f2f2", fg="#333333")
-        label.grid(row=0, column=0, pady=10, columnspan=2, sticky="w", padx=10)
+        label = tk.Label(parking_slots_frame, text="PARKING SLOT MANAGEMENT", font=FONT, fg=MAIN_COLOR ,pady=10)
+        label.grid(row=0, column=0, pady=10, columnspan=2, sticky="we", padx=10)
 
         # Left Column (Forms)
-        forms_frame = tk.Frame(parking_slots_frame, relief="raised", bd=3, bg="#ffffff")
+        forms_frame = tk.Frame(parking_slots_frame, relief="raised", bd=3, bg="#ffffff" ,padx=20 , pady=20)
         forms_frame.grid(row=1, column=0, padx=10, pady=20, sticky="n")
 
         # Create Parking Slot Form (Existing)
-        slot_label = tk.Label(forms_frame, text="Create Parking Slot", font=("Arial", 14, "bold"), bg="#ffffff", fg="#555555")
+        slot_label = tk.Label(forms_frame, text="Create Parking Slot", font=FONT, bg="#ffffff", fg="#555555")
         slot_label.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
 
         self.slot_name_label = tk.Label(forms_frame, text="Slot Name:", font=("Arial", 12), bg="#ffffff")
-        self.slot_name_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.slot_name_label.grid(row=1, column=0,  pady=5, sticky="w")
         self.slot_name_entry = tk.Entry(forms_frame, width=30)
         self.slot_name_entry.grid(row=1, column=1, padx=10, pady=5)
 
@@ -484,16 +510,16 @@ class Dashboard(Response):
         self.create_slot_button.grid(row=2, column=1, columnspan=2, padx=10, pady=10, sticky="we")
 
         # Assign Vehicle to Slot Form (Existing)
-        assign_label = tk.Label(forms_frame, text="Assign Vehicle to Slot", font=("Arial", 14, "bold"), bg="#ffffff", fg="#555555")
+        assign_label = tk.Label(forms_frame, text="Assign Vehicle to Slot", font=FONT, bg="#ffffff", fg="#555555")
         assign_label.grid(row=3, column=0, columnspan=2, pady=(20, 10), sticky="w")
 
         self.vehicle_plate_label = tk.Label(forms_frame, text="Vehicle Plate:", font=("Arial", 12), bg="#ffffff")
-        self.vehicle_plate_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.vehicle_plate_label.grid(row=4, column=0,  pady=5, sticky="w")
         self.vehicle_plate_entry = tk.Entry(forms_frame, width=30)
         self.vehicle_plate_entry.grid(row=4, column=1, padx=10, pady=5)
 
         self.slot_select_label = tk.Label(forms_frame, text="Slot Name:", font=("Arial", 12), bg="#ffffff")
-        self.slot_select_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.slot_select_label.grid(row=5, column=0, pady=5, sticky="w")
         self.slots = self.get_available_slots()  # Fetch slots from the database
         self.slot_select_entry = ttk.Combobox(forms_frame, values=self.slots, state="readonly", width=30)
         self.slot_select_entry.grid(row=5, column=1, padx=10, pady=5)
@@ -505,7 +531,7 @@ class Dashboard(Response):
         self.assign_vehicle_button.grid(row=6, column=1, columnspan=2, padx=10, pady=10, sticky="we")
 
         # Release Parking Slot Form (New)
-        release_label = tk.Label(forms_frame, text="Release Vehicle from Slot", font=("Arial", 14, "bold"), bg="#ffffff", fg="#555555")
+        release_label = tk.Label(forms_frame, text="Release Vehicle from Slot", font=FONT, bg="#ffffff", fg="#555555")
         release_label.grid(row=7, column=0, columnspan=2, pady=(20, 10), sticky="w")
 
         self.release_vehicle_plate_label = tk.Label(forms_frame, text="Vehicle Plate:", font=("Arial", 12), bg="#ffffff")
@@ -620,7 +646,7 @@ class Dashboard(Response):
         """Fetch all available parking slots from the database."""
         session = Session() 
         try:
-            slots = session.query(Slot.slot_name).filter(Slot.is_occupied == 0).all() 
+            slots = session.query(Slot.slot_name).filter(Slot.is_occupied == 0 , Slot.is_reserved == 0).all() 
             return [slot[0] for slot in slots]  
         except SQLAlchemyError as e:
             print(f"Error fetching slots: {str(e)}")
@@ -687,8 +713,8 @@ class Dashboard(Response):
         payments_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
 
         # Header Label
-        label = tk.Label(payments_frame, text="PAYMENT MANAGEMENT", font=FONT, bg="#f2f2f2", fg="#333333")
-        label.grid(row=0, column=0, pady=10, columnspan=2, sticky="w", padx=10)
+        label = tk.Label(payments_frame, text="PAYMENT MANAGEMENT", font=FONT, fg=MAIN_COLOR ,pady=10)
+        label.grid(row=0, column=0, pady=10, columnspan=2, sticky="we", padx=10)
 
         # Left Column (Form)
         forms_frame = tk.Frame(payments_frame, relief="raised", bd=3, bg="#ffffff")
@@ -759,6 +785,8 @@ class Dashboard(Response):
 
         payments_frame.grid_columnconfigure(0, weight=1)  # Ensure the forms adjust
         payments_frame.grid_columnconfigure(1, weight=1)  # Ensure the table adjusts
+        
+        self.populate_payment_table()
 
         self.show_frame(payments_frame)
 
@@ -787,7 +815,7 @@ class Dashboard(Response):
                 money_per_minute = 3000  # 3000 TZS per minute
                 total_amount = duration_in_minutes * money_per_minute
 
-                return messagebox.showinfo("SUCCESS", f"Total payment required for {plate_number}: {total_amount:.0f} TZS")
+                return total_amount , messagebox.showinfo("SUCCESS", f"Total payment required for {plate_number}: {total_amount:.0f} TZS")
 
             else:
                 return messagebox.showinfo("INFO", f"Entry or Exit time missing for {plate_number}")
@@ -807,12 +835,32 @@ class Dashboard(Response):
             return messagebox.showwarning("WARNING", "Please enter both the vehicle plate number and payment amount.")
 
         try:
-            # Convert payment amount to float
-            payment_amount = float(payment_amount)
+            try:
+                payment_amount = float(payment_amount)
+                if payment_amount <= 0:
+                    raise ValueError("The payment amount must be greater than zero.")
+            except ValueError as ve:
+                return messagebox.showwarning("ERROR", f"Invalid payment amount entered. {str(ve)}")
 
             session = Session()
 
-            # Check if the vehicle exists
+            parking_slot = session.query(ParkingSlot).join(Vehicle).filter(Vehicle.plate_number == plate_number).first()
+
+            if not parking_slot or not parking_slot.entry_time or not parking_slot.exit_time:
+                return messagebox.showwarning("ERROR", "Unable to retrieve required payment information. Ensure the vehicle is parked and has exit time recorded.")
+
+            duration = parking_slot.exit_time - parking_slot.entry_time  
+            total_minutes = duration.total_seconds() / 60  
+
+            # Calculate required payment: rate * time in minutes
+            parking_rate = 300  # Rate in TZS per minute
+            required_payment = total_minutes * parking_rate
+
+            # Verify if the entered payment amount matches or exceeds the required payment amount
+            if payment_amount < required_payment and payment_amount > required_payment:
+                return messagebox.showwarning("PAYMENT DISQUALIFIED", "required amount do not match. Try again.")
+            
+            # Check if the vehicle exists in the database
             vehicle = session.query(Vehicle).filter(Vehicle.plate_number == plate_number).first()
             if not vehicle:
                 return messagebox.showwarning("ERROR", f"No vehicle found with plate number {plate_number}")
@@ -821,27 +869,317 @@ class Dashboard(Response):
             new_payment = Payment(vehicle_id=vehicle.vehicle_id, payment_amount=payment_amount, is_paid=True)
             session.add(new_payment)
             
-            # Commit the payment record
+            # Commit the payment record to the database
             session.commit()
 
-            # Now, check if the vehicle is assigned to a parking slot
-            parking_slot = session.query(ParkingSlot).filter(ParkingSlot.vehicle_id == vehicle.vehicle_id).first()
+            # Check if the vehicle is assigned to a parking slot and delete the parking slot assignment
             if parking_slot:
-                # Delete the parking slot assignment for the vehicle
-                session.delete(parking_slot)
+                session.delete(parking_slot)  # Remove the parking slot assignment
                 session.commit()
 
-            # Success message
+            # Refresh the payment table and show a success message
+            self.refresh_payment_table()
             messagebox.showinfo("SUCCESS", f"Payment of {payment_amount} TZS has been successfully processed for vehicle {plate_number}.")
             
             # Clear the payment fields
             self.payment_plate_number_entry.delete(0, tk.END)
             self.payment_amount.delete(0, tk.END)
 
-        except ValueError:
-            return messagebox.showwarning("ERROR", "Invalid payment amount entered. Please enter a valid number.")
         except Exception as e:
-            session.rollback()  # Rollback in case of an error
-            return messagebox.showerror("ERROR", f"Error processing payment: {str(e)}")
+            session.rollback()  # Rollback any changes in case of an error
+            messagebox.showerror("ERROR", f"Error processing payment: {str(e)}")
         finally:
             session.close()
+
+    def populate_payment_table(self):
+        """Populates the payment details table with data from the database."""
+        try:
+            session = Session()
+            
+            # Query the Payment table and join with the Vehicle table to get plate numbers
+            payment_records = session.query(Payment, Vehicle).join(Vehicle, Payment.vehicle_id == Vehicle.vehicle_id).all()
+
+            # Clear existing rows in the treeview
+            self.payment_tree.delete(*self.payment_tree.get_children())
+
+            # Insert new rows into the treeview
+            for idx, (payment, vehicle) in enumerate(payment_records, start=1):
+                # Prepare data for each row
+                payment_status = "Paid" if payment.is_paid else "Not Paid"
+                self.payment_tree.insert("", "end", values=(
+                    idx,
+                    vehicle.plate_number,
+                    payment.payment_amount,
+                    payment_status
+                ))
+
+        except Exception as e:
+            messagebox.showerror("ERROR", f"Error populating payment table: {str(e)}")
+        finally:
+            session.close()
+
+    def refresh_payment_table(self):
+        """Clears the table and repopulates it with fresh data."""
+        self.payment_tree.delete(*self.payment_tree.get_children())  
+        self.populate_payment_table()  
+ 
+    def reserve_slot(self):
+        """Reserves a parking slot for a customer."""
+        email = self.reservation_email.get().strip()
+        slot_name = self.reservation_slot.get().strip()
+
+        if not email or not slot_name:
+            return messagebox.showwarning("WARNING", "Please enter both the customer email and slot name.")
+
+        try:
+            session = Session()
+
+            # Get the customer_id by querying the users table with email
+            customer = session.query(User).filter(User.email == email).first()
+            if not customer:
+                return messagebox.showwarning("ERROR", f"No user found with email {email}. Please check and try again.")
+
+            customer_id = customer.user_id
+
+            # Get the slot_id by querying the ParkingSlot table with slot_name
+            parking_slot = session.query(Slot).filter(Slot.slot_name == slot_name).first()
+            if not parking_slot:
+                return messagebox.showwarning("ERROR", f"No parking slot found with name {slot_name}. Please check and try again.")
+
+            slot_id = parking_slot.slot_id
+            session.query(Slot).filter(Slot.slot_id == slot_id).update({"is_reserved" :True})
+
+            # Check if the customer already has a reservation for this slot
+            existing_reservation = session.query(Reservation).filter(Reservation.customer_id == customer_id, Reservation.slot_id == slot_id).first()
+            if existing_reservation:
+                return messagebox.showwarning("ERROR", f"Slot {slot_name} is already reserved for {email}.")
+
+            # Create a new reservation record
+            new_reservation = Reservation(customer_id=customer_id, slot_id=slot_id ,reservation_time= datetime.now())
+            session.add(new_reservation)
+            
+            
+            # Commit the reservation record
+            session.commit()
+
+            # Success message
+            self.refresh_reservation_table()
+            messagebox.showinfo("SUCCESS", f"Slot {slot_name} has been successfully reserved for {email}.")
+            
+            # Clear the form
+            self.reservation_email.delete(0, tk.END)
+            self.reservation_slot.delete(0, tk.END)
+
+        except Exception as e:
+            session.rollback()  # Rollback any changes in case of an error
+            messagebox.showerror("ERROR", f"Error reserving slot: {str(e)}")
+        finally:
+            session.close()
+
+    def populate_reservation_table(self):
+        """Populates the reservation table with all existing reservations."""
+        try:
+            session = Session()
+            reservations = session.query(Reservation).all()
+
+            # Clear existing rows
+            for row in self.reservation_tree.get_children():
+                self.reservation_tree.delete(row)
+
+            # Insert new rows for each reservation
+            for idx, reservation in enumerate(reservations, start=1):
+                user_id = reservation.customer_id  # Get user ID
+                slot_id = reservation.slot_id  # Get parking slot ID
+
+                # Query the User and ParkingSlot tables for their details
+                user = session.query(User).filter(User.user_id == user_id).first()
+                parking_slot = session.query(Slot).filter(Slot.slot_id == slot_id).first()
+
+                if user and parking_slot:
+                    user_email = user.email  # Get the user's email
+                    slot_name = parking_slot.slot_name  # Get the slot name
+                    self.reservation_tree.insert("", "end", values=(idx, user_email, slot_name))
+                else:
+                    # Handle cases where user or parking slot might be missing
+                    self.reservation_tree.insert("", "end", values=(idx, "Unknown", "Unknown"))
+
+        except Exception as e:
+            messagebox.showerror("ERROR", f"Error loading reservations: {str(e)}")
+        finally:
+            session.close()
+
+    def refresh_reservation_table(self):
+        """Refreshes the reservation table with updated data."""
+        try:
+            # Query the database to get all reservation data
+            session = Session()
+            reservations = session.query(Reservation).all()
+
+            # Clear existing rows in the reservation table
+            for row in self.reservation_tree.get_children():
+                self.reservation_tree.delete(row)
+
+            # Insert new rows for each reservation record
+            for idx, reservation in enumerate(reservations, start=1):
+                user_id = reservation.customer_id  
+                slot_id = reservation.slot_id  
+                
+                user = session.query(User).filter(User.user_id == user_id).first()
+                parking_slot = session.query(Slot).filter(Slot.slot_id == slot_id).first()
+
+                if user and parking_slot:
+                    user_email = user.email 
+                    slot_name = parking_slot.slot_name 
+                    self.reservation_tree.insert("", "end", values=(idx, user_email, slot_name,))
+                else:
+                    self.reservation_tree.insert("", "end", values=(idx, "Unknown", "Unknown",))
+
+        except Exception as e:
+            messagebox.showerror("ERROR", f"Error refreshing reservation table: {str(e)}")
+        finally:
+            session.close()
+
+    def release_reservation(self, reservation_id):
+        """Releases a reservation, marking the slot as available and removing the reservation entry."""
+        try:
+            session = Session()
+
+            # Query the reservation by ID (or another identifying method)
+            reservation = session.query(Reservation).filter(Reservation.reservation_id == reservation_id).first()
+
+            if not reservation:
+                return messagebox.showwarning("ERROR", "Reservation not found.")
+
+            # Query the parking slot associated with the reservation
+            parking_slot = session.query(Slot).filter(Slot.slot_id == reservation.slot_id).first()
+
+            if not parking_slot:
+                return messagebox.showwarning("ERROR", "Parking slot not found.")
+
+            # Set the slot as available (not reserved)
+            parking_slot.is_reserved = False
+            session.commit()
+
+            # Delete the reservation record from the database
+            session.delete(reservation)
+            session.commit()
+
+            # Refresh the reservation table to reflect the change
+            self.refresh_reservation_table()
+
+            messagebox.showinfo("SUCCESS", "Reservation successfully released and slot made available.")
+
+        except Exception as e:
+            session.rollback()
+            messagebox.showerror("ERROR", f"Error releasing reservation: {str(e)}")
+
+        finally:
+            session.close()
+
+    def get_reserved_slots(self):
+        """Fetches all the reserved parking slots."""
+        try:
+            session = Session()
+
+            # Query the Slot table for reserved slots
+            reserved_slots = session.query(Slot).filter(Slot.is_reserved == True).all()
+
+            # Prepare a list of reserved slot names
+            reserved_slot_names = [slot.slot_name for slot in reserved_slots]
+
+            return reserved_slot_names
+
+        except Exception as e:
+            messagebox.showerror("ERROR", f"Error fetching reserved slots: {str(e)}")
+            return []
+
+        finally:
+            session.close()
+    
+    def show_reservations(self):
+        """Displays the Reservations management frame."""
+        reservations_frame = tk.Frame(self.root, bg="#f2f2f2", padx=20, pady=20)
+        
+        # Configure the root window to allow the reservations frame to expand
+        self.root.grid_rowconfigure(0, weight=1) 
+        self.root.grid_columnconfigure(0, weight=1)  
+
+        # Configure the reservations frame to fill the available space
+        reservations_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # Configure the frame's internal grid to make sure it stretches
+        reservations_frame.grid_rowconfigure(0, weight=0) 
+        reservations_frame.grid_rowconfigure(1, weight=1) 
+        reservations_frame.grid_rowconfigure(2, weight=5)  
+        reservations_frame.grid_columnconfigure(0, weight=1) 
+
+        
+        label = tk.Label(reservations_frame, text="Manage Reservations", font=FONT, fg=MAIN_COLOR ,pady=10)
+        label.grid(row=0, column=0 , columnspan=2,  sticky="we" )
+        
+        # Reservation Form
+        forms_frame = tk.Frame(reservations_frame, bg="#ffffff", bd=2 , relief="raised" ,padx=10 , pady=10)
+        forms_frame.grid(row=1, column=0, padx=10, pady=20, sticky="n")
+
+        # Reservation Form Label
+        reservation_label = tk.Label(forms_frame, text="Reserve Parking Slot", font=FONT, bg="#ffffff", fg="#555555")
+        reservation_label.grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+
+        # Customer Email
+        self.reservation_email_label = tk.Label(forms_frame, text="Customer Email:", font=("Arial", 12), bg="#ffffff")
+        self.reservation_email_label.grid(row=1, column=0,pady=5, sticky="w")
+        self.reservation_email = tk.Entry(forms_frame, width=30)
+        self.reservation_email.grid(row=1, column=1, padx=10, pady=5)
+
+        # Slot Name
+        self.reservation_slot_label = tk.Label(forms_frame, text="Slot Name:", font=("Arial", 12), bg="#ffffff")
+        self.reservation_slot_label.grid(row=2, column=0, pady=5, sticky="w")
+        self.slots = self.get_available_slots()  
+        self.reservation_slot = ttk.Combobox(forms_frame, values=self.slots, state="readonly", width=30)
+        self.reservation_slot.grid(row=2, column=1, padx=10, pady=5)
+
+        # Reserve Button
+        self.reserve_button = tk.Button(
+            forms_frame, text="Reserve Slot", fg="white", font=("Arial", 12, "bold"), bg=MAIN_COLOR,
+            command=self.reserve_slot, width=20
+        )
+        self.reserve_button.grid(row=3, column=1, padx=10, pady=10, sticky="we")
+        
+        # Table Frame for Displaying Reserved Slots
+        table_frame = tk.Frame(reservations_frame, bg="#f2f2f2", bd=3, relief="raised" ,pady=10 ,padx=10)
+        table_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Configure the row and column to expand and fill the available space
+        reservations_frame.grid_rowconfigure(1, weight=1, uniform="equal")
+        reservations_frame.grid_columnconfigure(1, weight=1, uniform="equal")
+
+        # Ensure the table_frame covers the full available space
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
+                # Table Header
+        columns = ("#", "email", "slot_name")
+        self.reservation_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=20)
+
+        self.reservation_tree.heading("#", text="#")
+        self.reservation_tree.column("#", anchor="center", width=30)
+        self.reservation_tree.heading("email", text="Customer Email")
+        self.reservation_tree.column("email", anchor="w")
+        self.reservation_tree.heading("slot_name", text="Slot Name")
+        self.reservation_tree.column("slot_name", anchor="w")
+
+
+        # Attach a Scrollbar
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.reservation_tree.yview)
+        self.reservation_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+
+        self.reservation_tree.pack(fill="both", expand=True)
+
+        # Configure the parent frame to allow full width
+        reservations_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        reservations_frame.grid_rowconfigure(0, weight=1)
+        reservations_frame.grid_columnconfigure(0, weight=1)
+
+        reservations_frame.grid_columnconfigure(0, weight=1) 
+        self.populate_reservation_table()          
+        self.show_frame(reservations_frame)
