@@ -103,7 +103,6 @@ class User(Base , Response):
             }
         return "User not found."
 
-
 class Slot(Base ,Response):
     __tablename__ = "slots"
     slot_id = sm.Column("slot_id" ,sm.String(36)  ,primary_key=True, default=lambda :str(uuid.uuid1()))

@@ -4,17 +4,7 @@ from datetime import datetime
 from views import SignUp, Login ,Dashboard
 
 class SmartParkingApp:
-    '''
-        The main application entry point 
-        This will be used to route over the whole application.
-        It will contain different methods and data attributes to work with.
-        
-        @ ===> made by Nasr the Software developer
-        
-        @ ===> Email : nasrkihagila@gmail.com
-        
-        @ ===> Phone : +255 620 656 604
-    '''
+
     def __init__(self, root):
         self.root = root
         self.login_view = Login(root=root, switch_to_signup=self.switch_to_signup)
@@ -30,7 +20,7 @@ class SmartParkingApp:
         self.sign_up_view.show_frame() 
          
     def switch_to_login(self):
-        '''Switch to the login view '''
+        '''Switch to the login view '''  
         self.sign_up_view.hide_frame()  
         self.login_view.show_frame() 
          
