@@ -838,10 +838,10 @@ class Dashboard(Response):
                 return messagebox.showwarning("ERROR", "Unable to retrieve required payment information. Ensure the vehicle is parked and has exit time recorded.")
 
             duration = parking_slot.exit_time - parking_slot.entry_time  
-            total_minutes = duration.total_seconds() 
+            total_minutes = duration.total_seconds() / 60  
 
             # Calculate required payment: rate * time in minutes
-            parking_rate = 1  # Rate in TZS per minute
+            parking_rate = 300  # Rate in TZS per minute
             required_payment = total_minutes * parking_rate
 
             # Verify if the entered payment amount matches or exceeds the required payment amount
@@ -991,7 +991,10 @@ class Dashboard(Response):
                     user_email = user.email  # Get the user's email
                     slot_name = parking_slot.slot_name  # Get the slot name
                     self.reservation_tree.insert("", "end", values=(idx, user_email, slot_name))
-                
+                else:
+                    # Handle cases where user or parking slot might be missing
+                    self.reservation_tree.insert("", "end", values=(idx, "Unknown", "Unknown"))
+
         except Exception as e:
             messagebox.showerror("ERROR", f"Error loading reservations: {str(e)}")
         finally:
@@ -1020,6 +1023,8 @@ class Dashboard(Response):
                     user_email = user.email 
                     slot_name = parking_slot.slot_name 
                     self.reservation_tree.insert("", "end", values=(idx, user_email, slot_name,))
+                else:
+                    self.reservation_tree.insert("", "end", values=(idx, "Unknown", "Unknown",))
 
         except Exception as e:
             messagebox.showerror("ERROR", f"Error refreshing reservation table: {str(e)}")
